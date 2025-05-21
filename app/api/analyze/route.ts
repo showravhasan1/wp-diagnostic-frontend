@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
-import { chromium } from "playwright";
-
-export const runtime = "edge"; // or remove this line if needed
+import chromium from "chrome-aws-lambda";
+import puppeteer from "puppeteer-core";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -11,25 +10,27 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify({ error: "URL is required" }), { status: 400 });
   }
 
-  let browser;
+  let browser = null;
+
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath,
+      headless: chromium.headless
     });
 
-    const context = await browser.newContext();
-    const page = await context.newPage();
+    const page = await browser.newPage();
     const resources: any[] = [];
 
-    await page.route("**/*", (route) => {
-      const request = route.request();
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
       resources.push({
-        url: request.url(),
-        method: request.method(),
-        type: request.resourceType(),
+        url: req.url(),
+        method: req.method(),
+        type: req.resourceType(),
       });
-      route.continue();
+      req.continue();
     });
 
     await page.goto(url, { waitUntil: "load", timeout: 30000 });
@@ -71,6 +72,7 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify({ summary, bottlenecks, resources }), {
       headers: { "Content-Type": "application/json" }
     });
+
   } catch (error: any) {
     return new Response(
       JSON.stringify({
