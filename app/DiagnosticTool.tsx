@@ -18,7 +18,7 @@ export default function DiagnosticTool() {
     setLoading(true);
     setResult(null);
     try {
-      const endpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/analyze`;
+      const endpoint = "/api/analyze";
 
       const response = await fetch(endpoint, {
         method: "POST",
